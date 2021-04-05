@@ -1,0 +1,22 @@
+{
+  "name": "IFAE_DataAdquisition",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "4.17.1",
+    "ftp": "^0.3.10",
+    "node-fetch": "2.6.1",
+    "node-schedule": "2.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "2.0.7"
+  }
+}

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Descarga HMI</title>
+    <link rel="icon" type="image/png" href="favicon.jpg">
+    <script>
+        async function descargaDatos() {
+            try {
+                let response = await fetch('descarga', {
+                    method: 'GET'
+                });
+                if (response.status == 200) { 
+                    document.querySelector('#datos').click();
+                }
+                else window.alert('Ha habido un error al contactar con el servidor');
+            }
+            catch {
+                window.alert('Ha habido un error al contactar con el servidor');
+            }
+        }
+        async function descargaAlarmas() {
+            try {
+                let response = await fetch('descarga', {
+                    method: 'GET'
+                });
+                if (response.status == 200) { 
+                    document.querySelector('#alarmas').click();
+                }
+                else window.alert('Ha habido un error al contactar con el servidor');
+            }
+            catch {
+                window.alert('Ha habido un error al contactar con el servidor');
+            }
+        }
+    </script>
+    <style>
+        .button {
+            border-radius: 0;
+            font-size: 20px;
+            color: white;
+            background-color: #B0B0B0;
+            border: hidden;
+        }
+    </style>
+</head>
+
+<body style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; overflow: hidden;">
+    <div style="display: flex; flex-direction: column; justify-content: flex-start; align-items: center; flex-grow: 1;">
+        <img style="width: 300px; margin-bottom: 15px;" src="tt_logo.png">
+        <div style="width: 100vw; flex-basis: 3px; background-color: #006699;"></div>
+        <h2 style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #006699;">Industry 4.0 Services</h2>
+        <button class="button" style="width: 60%; flex-basis: 60px; margin-bottom: 20px;" onclick="descargaDatos()">
+            Descargar datos
+        </button>
+        <button class="button" style="width: 60%; flex-basis: 60px" onclick="descargaAlarmas()">
+            Descargar alarmas
+        </button>
+        <a id="datos" href="Datos.csv" download="Datos.csv" hidden></a>
+        <a id="alarmas" href="Alarmas.csv" download="Alarmas.csv" hidden></a>
+    </div>
+    <p style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 10px; flex-grow: 0;">Developed by Ángel Fernández Sobrino</p>
+</body>
+
+</html>
