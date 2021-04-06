@@ -9,7 +9,7 @@ const cookie = require('cookie');
 const PORT = process.env.PORT || 8080;
 
 // eslint-disable-next-line no-undef
-const HMI_IP = process.env.HMI_IP || '';
+const HMI_IP = process.env.HMI_IP || 'http://172.16.7.204';
 // eslint-disable-next-line no-undef
 const FTP_SERVER_DIRECTION = process.env.FTP_SERVER_DIRECTION || 'ftp';
 // eslint-disable-next-line no-undef
@@ -25,35 +25,37 @@ const NOMBRE_ARCHIVO_DATOS = process.env.NOMBRE_ARCHIVO_DATOS || 'datos.csv';
 const NOMBRE_ARCHIVO_ALARMAS = process.env.NOMBRE_ARCHIVO_ALARMAS || 'alarmas.csv';
 
 //const HMI_LOGIN = 'reqres.in/api/users'; // 'LoginForm'
-const HMI_LOGIN = 'upc.edu'; // 'LoginForm'
-const HMI_DOWNLOAD_DATA = 'people.sc.fsu.edu/~jburkardt/data/csv/snakes_count_10.csv'; // '/StorageCardSD/Logs/Datos0.csv?UP=TRUE&FORCEBROWSE'
-const HMI_DOWNLOAD_ALARMS = 'people.sc.fsu.edu/~jburkardt/data/csv/snakes_count_100.csv'; // '/StorageCardSD/Logs/Alarmas0.csv?UP=TRUE&FORCEBROWSE'
+const HMI_LOGIN = '/FormLogin'; // 'LoginForm'
+const HMI_DOWNLOAD_DATA = '/StorageCardSD/Logs/Datos0.csv?UP=TRUE&FORCEBROWSE'; // '/StorageCardSD/Logs/Datos0.csv?UP=TRUE&FORCEBROWSE'
+const HMI_DOWNLOAD_ALARMS = '/StorageCardSD/Logs/Alarmas0.csv?UP=TRUE&FORCEBROWSE'; // '/StorageCardSD/Logs/Alarmas0.csv?UP=TRUE&FORCEBROWSE'
 
 var app = express();
 
 // eslint-disable-next-line no-unused-vars
 const weekDataSaving = schedule.scheduleJob('0 23 * * 0', function () {
-	ftpRecorder();
+	//ftpRecorder();
 });
 
 // eslint-disable-next-line no-unused-vars
-const actualDataSaving = schedule.scheduleJob('0 * * * *', function () {
-	ftpUpdate();
+const actualDataSaving = schedule.scheduleJob(' * * * * *', function () {
+	//ftpUpdate();
 });
 
 app.use(express.static('public'));
 
 
-app.get('/descarga', (req, res) => {
-	fileDownload(res);
+app.get('/descargaAlarmas', (req, res) => {
+	alarmasDownload(res);
+});
+app.get('/descargaDatos', (req, res) => {
+	datosDownload(res);
 });
 
 app.listen(PORT, () => {
 	console.info(`Server listening at port: ${PORT}`);
 });
 
-async function fileDownload(res) {
-	let datos = fs.createWriteStream('./public/Datos.csv');
+async function alarmasDownload(res) {
 	let alarmas = fs.createWriteStream('./public/Alarmas.csv');
 	console.info('HMI local data update');
 	let siemens_ad_session = await loginIntoHMI();
@@ -62,18 +64,42 @@ async function fileDownload(res) {
 		return console.error('Impossible to login into HMI');
 	}
 	try {
-		let datosRequest = await fetch(HMI_IP + HMI_DOWNLOAD_DATA, {
+		fetch(HMI_IP + HMI_DOWNLOAD_ALARMS, {
 			method: 'GET',
 			headers: { 'Cookie': 'siemens_ad_session=' + siemens_ad_session },
-		});
-		await datosRequest.body.pipe(datos);
-		let alarmasRequest = await fetch(HMI_IP + HMI_DOWNLOAD_ALARMS, {
-			method: 'GET',
-			headers: { 'Cookie': 'siemens_ad_session=' + siemens_ad_session },
-		});
-		await alarmasRequest.body.pipe(alarmas);
+		}).then(data => {
+			data.body.pipe(alarmas);
+			res.status(200).send();
+		})
+	}
+	catch (error) {
+		console.error(error);
+		res.status(500).send();
+	}
+}
 
-		res.status(200).send();
+async function datosDownload(res) {
+	
+	console.info('HMI local data update');
+	let siemens_ad_session = await loginIntoHMI();
+	if (!siemens_ad_session) {
+		res.status(500).send();
+		return console.error('Impossible to login into HMI');
+	}
+	try {
+		fetch(HMI_IP + HMI_DOWNLOAD_DATA, {
+			method: 'GET',
+			headers: { 'Cookie': 'siemens_ad_session=' + siemens_ad_session },
+			timeout: 60000
+		}).then((datos) => {
+			console.log('saving');
+			let file = fs.createWriteStream('./public/Datos.csv');
+			let stream = datos.body.pipe(file);
+			stream.on('finish', () =>{
+				console.log('saved');
+				res.status(200).send();
+			  });
+		});
 	}
 	catch (error) {
 		console.error(error);

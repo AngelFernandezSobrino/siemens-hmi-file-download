@@ -7,7 +7,7 @@
     <script>
         async function descargaDatos() {
             try {
-                let response = await fetch('descarga', {
+                let response = await fetch('descargaDatos', {
                     method: 'GET'
                 });
                 if (response.status == 200) { 
@@ -21,7 +21,7 @@
         }
         async function descargaAlarmas() {
             try {
-                let response = await fetch('descarga', {
+                let response = await fetch('descargaAlarmas', {
                     method: 'GET'
                 });
                 if (response.status == 200) { 
