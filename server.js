@@ -5,23 +5,23 @@ const Client = require('ftp');
 const fs = require('fs');
 
 // eslint-disable-next-line no-undef
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 8080;
 
 // eslint-disable-next-line no-undef
 const HMI_IP = process.env.HMI_IP || '';
 // eslint-disable-next-line no-undef
-const FTP_SERVER_DIRECTION = process.env.FTP_SERVER_DIRECTION;
+const FTP_SERVER_DIRECTION = process.env.FTP_SERVER_DIRECTION || 'ftp';
 // eslint-disable-next-line no-undef
-const FTP_SERVER_PORT = process.env.FTP_SERVER_PORT;
+const FTP_SERVER_PORT = process.env.FTP_SERVER_PORT || 21;
 // eslint-disable-next-line no-undef
-const FTP_SERVER_USER = process.env.FTP_SERVER_USER;
+const FTP_SERVER_USER = process.env.FTP_SERVER_USER || 'hmi';
 // eslint-disable-next-line no-undef
-const FTP_SERVER_PASSWORD = process.env.FTP_SERVER_PASSWORD;
+const FTP_SERVER_PASSWORD = process.env.FTP_SERVER_PASSWORD || 'asdf123456789';
 
 // eslint-disable-next-line no-undef
-const NOMBRE_ARCHIVO_DATOS = process.env.NOMBRE_ARCHIVO_DATOS;
+const NOMBRE_ARCHIVO_DATOS = process.env.NOMBRE_ARCHIVO_DATOS || 'datos.csv';
 // eslint-disable-next-line no-undef
-const NOMBRE_ARCHIVO_ALARMAS = process.env.NOMBRE_ARCHIVO_ALARMAS;
+const NOMBRE_ARCHIVO_ALARMAS = process.env.NOMBRE_ARCHIVO_ALARMAS || 'alarmas.csv';
 
 const HMI_LOGIN = 'https://reqres.in/api/users'; // 'LoginForm'
 const HMI_DOWNLOAD_DATA = 'https://people.sc.fsu.edu/~jburkardt/data/csv/snakes_count_10.csv'; // '/StorageCardSD/Logs/Datos0.csv?UP=TRUE&FORCEBROWSE'
@@ -30,37 +30,33 @@ const HMI_DOWNLOAD_ALARMS = 'https://people.sc.fsu.edu/~jburkardt/data/csv/snake
 var app = express();
 
 // eslint-disable-next-line no-unused-vars
-const job1 = schedule.scheduleJob('0 23 1 * *', function () {
+const weekDataSaving = schedule.scheduleJob('0 23 * * 0', function () {
 	ftpRecorder();
 });
 
 // eslint-disable-next-line no-unused-vars
-const job2 = schedule.scheduleJob('0 * * * *', function () {
+const actualDataSaving = schedule.scheduleJob('0 * * * *', function () {
 	ftpUpdate();
 });
+
 app.use(express.static('public'));
+
 
 app.get('/descarga', (req, res) => {
 	fileDownload(res);
 });
 
-app.listen(3000, () => {
-	console.log(`Server listening at port: ${PORT}`);
+app.listen(PORT, () => {
+	console.info(`Server listening at port: ${PORT}`);
 });
 
 async function fileDownload(res) {
 	let datos = fs.createWriteStream('./public/Datos.csv');
 	let alarmas = fs.createWriteStream('./public/Alarmas.csv');
+	console.info('HMI local data update');
+	let siemens_ad_session = await loginIntoHMI();
+	if (!siemens_ad_session) return console.error('Impossible to login into HMI');
 	try {
-		console.log('HMI Data Fetch');
-		let loginRequest = await fetch(HMI_IP + HMI_LOGIN, {
-			method: 'POST',
-			body: 'Login=admin&Password=3333',
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-		});
-		console.log(loginRequest.headers.raw()['set-cookie']);
-		let siemens_ad_session = loginRequest.headers.raw()['set-cookie'];
-
 		let datosRequest = await fetch(HMI_IP + HMI_DOWNLOAD_DATA, {
 			method: 'GET',
 			headers: { 'Cookie': 'siemens_ad_session=' + siemens_ad_session },
@@ -71,10 +67,11 @@ async function fileDownload(res) {
 			headers: { 'Cookie': 'siemens_ad_session=' + siemens_ad_session },
 		});
 		await alarmasRequest.body.pipe(alarmas);
+
 		res.status(200).send();
 	}
 	catch (error) {
-		console.log(error);
+		console.error(error);
 		res.status(500).send();
 	}
 }
@@ -82,17 +79,10 @@ async function fileDownload(res) {
 async function ftpUpdate() {
 	let datosString = 'Error al recibir los datos del HMI';
 	let alarmasString = 'Error al recibir los datos del HMI';
+	console.info('HMI ftp data update');
+	let siemens_ad_session = await loginIntoHMI();
+	if (!siemens_ad_session) return console.error('Impossible to login into HMI');
 	try {
-		console.log('HMI Data Fetch');
-		console.log(HMI_IP + HMI_LOGIN);
-		let loginRequest = await fetch(HMI_IP + HMI_LOGIN, {
-			method: 'POST',
-			body:    'Login=admin&Password=3333',
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-		});
-		console.log(loginRequest.headers.raw()['set-cookie']);
-		let siemens_ad_session = loginRequest.headers.raw()['set-cookie'];
-
 		let datosRequest = await fetch(HMI_IP + HMI_DOWNLOAD_DATA, {
 			method: 'GET',
 			headers: { 'Cookie': 'siemens_ad_session=' + siemens_ad_session },
@@ -121,24 +111,18 @@ async function ftpUpdate() {
 			password: FTP_SERVER_PASSWORD
 		});
 	}
-	catch (err) {
-		console.log(err);
+	catch (error) {
+		console.log(error);
 	}
 }
 
 async function ftpRecorder() {
 	let datosString = 'Error al recibir los datos del HMI';
 	let alarmasString = 'Error al recibir los datos del HMI';
+	console.log('HMI ftp data recording');
+	let siemens_ad_session = await loginIntoHMI();
+	if (!siemens_ad_session) return console.error('Impossible to login into HMI');
 	try {
-		console.log('HMI Data Fetch');
-		let loginRequest = await fetch(HMI_IP + HMI_LOGIN, {
-			method: 'POST',
-			body: 'Login=admin&Password=3333',
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-		});
-		console.log(loginRequest.headers.raw()['set-cookie']);
-		let siemens_ad_session = loginRequest.headers.raw()['set-cookie'];
-
 		let datosRequest = await fetch(HMI_IP + HMI_DOWNLOAD_DATA, {
 			method: 'GET',
 			headers: { 'Cookie': 'siemens_ad_session=' + siemens_ad_session },
@@ -170,8 +154,24 @@ async function ftpRecorder() {
 			password: FTP_SERVER_PASSWORD
 		});
 	}
-	catch (err) {
-		console.log(err);
+	catch (error) {
+		console.log(error);
+	}
+}
+
+async function loginIntoHMI() {
+	try {
+		console.log('HMI Data Fetch');
+		let loginRequest = await fetch(HMI_IP + HMI_LOGIN, {
+			method: 'POST',
+			body: 'Login=admin&Password=3333',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+		});
+		console.log(loginRequest.headers.raw()['set-cookie']);
+		return loginRequest.headers.raw()['set-cookie'];
+	} catch (e) {
+		console.log(e);
+		return false;
 	}
 }
 
