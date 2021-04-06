@@ -11,8 +11,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "ftp": "^0.3.10",
+    "cookie": "^0.4.1",
     "express": "4.17.1",
+    "ftp": "^0.3.10",
     "node-fetch": "2.6.1",
     "node-schedule": "2.0.0"
   },

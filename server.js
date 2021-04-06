@@ -3,6 +3,7 @@ const express = require('express');
 const fetch = require('node-fetch');
 const Client = require('ftp');
 const fs = require('fs');
+const cookie = require('cookie');
 
 // eslint-disable-next-line no-undef
 const PORT = process.env.PORT || 8080;
@@ -23,9 +24,10 @@ const NOMBRE_ARCHIVO_DATOS = process.env.NOMBRE_ARCHIVO_DATOS || 'datos.csv';
 // eslint-disable-next-line no-undef
 const NOMBRE_ARCHIVO_ALARMAS = process.env.NOMBRE_ARCHIVO_ALARMAS || 'alarmas.csv';
 
-const HMI_LOGIN = 'https://reqres.in/api/users'; // 'LoginForm'
-const HMI_DOWNLOAD_DATA = 'https://people.sc.fsu.edu/~jburkardt/data/csv/snakes_count_10.csv'; // '/StorageCardSD/Logs/Datos0.csv?UP=TRUE&FORCEBROWSE'
-const HMI_DOWNLOAD_ALARMS = 'https://people.sc.fsu.edu/~jburkardt/data/csv/snakes_count_100.csv'; // '/StorageCardSD/Logs/Alarmas0.csv?UP=TRUE&FORCEBROWSE'
+//const HMI_LOGIN = 'reqres.in/api/users'; // 'LoginForm'
+const HMI_LOGIN = 'upc.edu'; // 'LoginForm'
+const HMI_DOWNLOAD_DATA = 'people.sc.fsu.edu/~jburkardt/data/csv/snakes_count_10.csv'; // '/StorageCardSD/Logs/Datos0.csv?UP=TRUE&FORCEBROWSE'
+const HMI_DOWNLOAD_ALARMS = 'people.sc.fsu.edu/~jburkardt/data/csv/snakes_count_100.csv'; // '/StorageCardSD/Logs/Alarmas0.csv?UP=TRUE&FORCEBROWSE'
 
 var app = express();
 
@@ -55,7 +57,10 @@ async function fileDownload(res) {
 	let alarmas = fs.createWriteStream('./public/Alarmas.csv');
 	console.info('HMI local data update');
 	let siemens_ad_session = await loginIntoHMI();
-	if (!siemens_ad_session) return console.error('Impossible to login into HMI');
+	if (!siemens_ad_session) {
+		res.status(500).send();
+		return console.error('Impossible to login into HMI');
+	}
 	try {
 		let datosRequest = await fetch(HMI_IP + HMI_DOWNLOAD_DATA, {
 			method: 'GET',
@@ -161,14 +166,17 @@ async function ftpRecorder() {
 
 async function loginIntoHMI() {
 	try {
-		console.log('HMI Data Fetch');
+		console.log('HMI Login ' + HMI_IP + HMI_LOGIN);
 		let loginRequest = await fetch(HMI_IP + HMI_LOGIN, {
 			method: 'POST',
 			body: 'Login=admin&Password=3333',
 			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
 		});
-		console.log(loginRequest.headers.raw()['set-cookie']);
-		return loginRequest.headers.raw()['set-cookie'];
+		let cookiesArray = loginRequest.headers.get('set-cookie');
+		let cookieValue = cookie.parse(cookiesArray);
+
+		console.log(cookieValue['siemens_ad_session']);
+		return cookieValue['siemens_ad_session'];
 	} catch (e) {
 		console.log(e);
 		return false;
