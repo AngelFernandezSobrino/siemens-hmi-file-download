@@ -33,12 +33,14 @@ var app = express();
 
 // eslint-disable-next-line no-unused-vars
 const weekDataSaving = schedule.scheduleJob('0 23 * * 0', function () {
-	//ftpRecorder();
+	ftpRecordDatos();
+	ftpRecordAlarmas();
 });
 
 // eslint-disable-next-line no-unused-vars
-const actualDataSaving = schedule.scheduleJob(' * * * * *', function () {
-	//ftpUpdate();
+const actualDataSaving = schedule.scheduleJob('0 * * * *', function () {
+	ftpUpdateDatos();
+	ftpUpdateAlarmas();
 });
 
 app.use(express.static('public'));
@@ -56,8 +58,6 @@ app.listen(PORT, () => {
 });
 
 async function alarmasDownload(res) {
-	let alarmas = fs.createWriteStream('./public/Alarmas.csv');
-	console.info('HMI local data update');
 	let siemens_ad_session = await loginIntoHMI();
 	if (!siemens_ad_session) {
 		res.status(500).send();
@@ -67,10 +67,14 @@ async function alarmasDownload(res) {
 		fetch(HMI_IP + HMI_DOWNLOAD_ALARMS, {
 			method: 'GET',
 			headers: { 'Cookie': 'siemens_ad_session=' + siemens_ad_session },
-		}).then(data => {
-			data.body.pipe(alarmas);
-			res.status(200).send();
-		})
+			timeout: 60000
+		}).then((datos) => {
+			let file = fs.createWriteStream('./public/Alarmas.csv');
+			let stream = datos.body.pipe(file);
+			stream.on('finish', () => {
+				res.status(200).send();
+			});
+		});
 	}
 	catch (error) {
 		console.error(error);
@@ -79,8 +83,6 @@ async function alarmasDownload(res) {
 }
 
 async function datosDownload(res) {
-	
-	console.info('HMI local data update');
 	let siemens_ad_session = await loginIntoHMI();
 	if (!siemens_ad_session) {
 		res.status(500).send();
@@ -92,13 +94,11 @@ async function datosDownload(res) {
 			headers: { 'Cookie': 'siemens_ad_session=' + siemens_ad_session },
 			timeout: 60000
 		}).then((datos) => {
-			console.log('saving');
 			let file = fs.createWriteStream('./public/Datos.csv');
 			let stream = datos.body.pipe(file);
-			stream.on('finish', () =>{
-				console.log('saved');
+			stream.on('finish', () => {
 				res.status(200).send();
-			  });
+			});
 		});
 	}
 	catch (error) {
@@ -107,86 +107,141 @@ async function datosDownload(res) {
 	}
 }
 
-async function ftpUpdate() {
-	let datosString = 'Error al recibir los datos del HMI';
-	let alarmasString = 'Error al recibir los datos del HMI';
-	console.info('HMI ftp data update');
+async function ftpUpdateDatos() {
 	let siemens_ad_session = await loginIntoHMI();
 	if (!siemens_ad_session) return console.error('Impossible to login into HMI');
 	try {
-		let datosRequest = await fetch(HMI_IP + HMI_DOWNLOAD_DATA, {
+		fetch(HMI_IP + HMI_DOWNLOAD_DATA, {
 			method: 'GET',
 			headers: { 'Cookie': 'siemens_ad_session=' + siemens_ad_session },
-		});
-		let alarmasRequest = await fetch(HMI_IP + HMI_DOWNLOAD_ALARMS, {
-			method: 'GET',
-			headers: { 'Cookie': 'siemens_ad_session=' + siemens_ad_session },
-		});
-		datosString = await datosRequest.text();
-		alarmasString = await alarmasRequest.text();
-
-		var c = new Client();
-		c.on('ready', function () {
-			c.put(datosString, 'DatosActual.csv', function (dataPutError) {
-				if (dataPutError) throw dataPutError;
-				c.put(alarmasString, 'AlarmasActual.csv', function (alarmsPutError) {
-					if (alarmsPutError) throw alarmsPutError;
-					c.end();
+			timeout: 60000
+		}).then((datos) => {
+			let file = fs.createWriteStream('./public/DatosUpdate.csv');
+			let stream = datos.body.pipe(file);
+			stream.on('finish', () => {
+				let ftpServer = new Client();
+				ftpServer.on('ready', function () {
+					ftpServer.put('./public/DatosUpdate.csv', 'DatosActual.csv', function (dataPutError) {
+						if (dataPutError) throw dataPutError;
+						ftpServer.end();
+					});
+				});
+				ftpServer.connect({
+					host: FTP_SERVER_DIRECTION,
+					port: FTP_SERVER_PORT,
+					user: FTP_SERVER_USER,
+					password: FTP_SERVER_PASSWORD
 				});
 			});
 		});
-		c.connect({
-			host: FTP_SERVER_DIRECTION,
-			port: FTP_SERVER_PORT,
-			user: FTP_SERVER_USER,
-			password: FTP_SERVER_PASSWORD
-		});
 	}
 	catch (error) {
-		console.log(error);
+		console.error(error);
+		ftpUpdateDatos();
 	}
 }
 
-async function ftpRecorder() {
-	let datosString = 'Error al recibir los datos del HMI';
-	let alarmasString = 'Error al recibir los datos del HMI';
-	console.log('HMI ftp data recording');
+async function ftpUpdateAlarmas() {
 	let siemens_ad_session = await loginIntoHMI();
 	if (!siemens_ad_session) return console.error('Impossible to login into HMI');
 	try {
-		let datosRequest = await fetch(HMI_IP + HMI_DOWNLOAD_DATA, {
+		fetch(HMI_IP + HMI_DOWNLOAD_ALARMS, {
 			method: 'GET',
 			headers: { 'Cookie': 'siemens_ad_session=' + siemens_ad_session },
-		});
-		let alarmasRequest = await fetch(HMI_IP + HMI_DOWNLOAD_ALARMS, {
-			method: 'GET',
-			headers: { 'Cookie': 'siemens_ad_session=' + siemens_ad_session },
-		});
-		datosString = await datosRequest.text();
-		alarmasString = await alarmasRequest.text();
-
-		let date = new Date(Date.now());
-
-		var c = new Client();
-		c.on('ready', function () {
-			c.put(datosString, NOMBRE_ARCHIVO_DATOS + '_' + formatDate(date) + '.csv', function (datosPutError) {
-				if (datosPutError) throw datosPutError;
-				c.put(alarmasString, NOMBRE_ARCHIVO_ALARMAS + '_' + formatDate(date) + '.csv', function (alarmasPutError) {
-					if (alarmasPutError) throw alarmasPutError;
-					c.end();
+			timeout: 60000
+		}).then((datos) => {
+			let file = fs.createWriteStream('./public/AlarmasUpdate.csv');
+			let stream = datos.body.pipe(file);
+			stream.on('finish', () => {
+				let ftpServer = new Client();
+				ftpServer.on('ready', function () {
+					ftpServer.put('./public/AlarmasUpdate.csv', 'AlarmasActual.csv', function (alarmsPutError) {
+						if (alarmsPutError) throw alarmsPutError;
+						ftpServer.end();
+					});
+				});
+				ftpServer.connect({
+					host: FTP_SERVER_DIRECTION,
+					port: FTP_SERVER_PORT,
+					user: FTP_SERVER_USER,
+					password: FTP_SERVER_PASSWORD
 				});
 			});
 		});
-		// connect to localhost:21 as anonymous
-		c.connect({
-			host: FTP_SERVER_DIRECTION,
-			port: FTP_SERVER_PORT,
-			user: FTP_SERVER_USER,
-			password: FTP_SERVER_PASSWORD
+	}
+	catch (error) {
+		console.error(error);
+		ftpUpdateAlarmas();
+	}
+}
+
+async function ftpRecordDatos() {
+	let siemens_ad_session = await loginIntoHMI();
+	if (!siemens_ad_session) return console.error('Impossible to login into HMI');
+	try {
+		fetch(HMI_IP + HMI_DOWNLOAD_DATA, {
+			method: 'GET',
+			headers: { 'Cookie': 'siemens_ad_session=' + siemens_ad_session },
+			timeout: 60000
+		}).then((datos) => {
+			let file = fs.createWriteStream('./public/DatosRecord.csv');
+			let stream = datos.body.pipe(file);
+			stream.on('finish', () => {
+				let date = new Date(Date.now());
+				let ftpServer = new Client();
+				ftpServer.on('ready', function () {
+					ftpServer.put('./public/DatosRecord.csv', NOMBRE_ARCHIVO_DATOS + '_' + formatDate(date) + '.csv', function (dataPutError) {
+						if (dataPutError) throw dataPutError;
+						ftpServer.end();
+					});
+				});
+				ftpServer.connect({
+					host: FTP_SERVER_DIRECTION,
+					port: FTP_SERVER_PORT,
+					user: FTP_SERVER_USER,
+					password: FTP_SERVER_PASSWORD
+				});
+			});
 		});
 	}
 	catch (error) {
-		console.log(error);
+		console.error(error);
+		ftpUpdateDatos();
+	}
+}
+
+async function ftpRecordAlarmas() {
+	let siemens_ad_session = await loginIntoHMI();
+	if (!siemens_ad_session) return console.error('Impossible to login into HMI');
+	try {
+		fetch(HMI_IP + HMI_DOWNLOAD_ALARMS, {
+			method: 'GET',
+			headers: { 'Cookie': 'siemens_ad_session=' + siemens_ad_session },
+			timeout: 60000
+		}).then((datos) => {
+			let file = fs.createWriteStream('./public/AlarmasRecord.csv');
+			let stream = datos.body.pipe(file);
+			stream.on('finish', () => {
+				let date = new Date(Date.now());
+				let ftpServer = new Client();
+				ftpServer.on('ready', function () {
+					ftpServer.put('./public/AlarmasRecord.csv', NOMBRE_ARCHIVO_ALARMAS + '_' + formatDate(date) + '.csv', function (alarmsPutError) {
+						if (alarmsPutError) throw alarmsPutError;
+						ftpServer.end();
+					});
+				});
+				ftpServer.connect({
+					host: FTP_SERVER_DIRECTION,
+					port: FTP_SERVER_PORT,
+					user: FTP_SERVER_USER,
+					password: FTP_SERVER_PASSWORD
+				});
+			});
+		});
+	}
+	catch (error) {
+		console.error(error);
+		ftpUpdateDatos();
 	}
 }
 
