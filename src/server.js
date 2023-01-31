@@ -247,7 +247,7 @@ async function ftpRecordAlarmas() {
 
 async function loginIntoHMI() {
 	try {
-		console.log('HMI Login ' + HMI_IP + HMI_LOGIN);
+		
 		let loginRequest = await fetch(HMI_IP + HMI_LOGIN, {
 			method: 'POST',
 			body: 'Login=admin&Password=3333',

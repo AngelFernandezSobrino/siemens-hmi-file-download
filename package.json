@@ -1,5 +1,5 @@
 {
-  "name": "IFAE_DataAdquisition",
+  "name": "SiemensHMIDataAdquisition",
   "version": "1.0.0",
   "description": "",
   "main": "server.js",

@@ -1,7 +1,7 @@
 version: '3'
 services:
   api:
-    image: 'ieetec/ifae/hmidataadquisition'
+    image: 'ieetec/hmidataadquisition'
     build: .
     env_file:
       - .env
@@ -13,4 +13,4 @@ services:
       - "21:21"
       - "21000-21010:21000-21010"
     environment:
-      - USERS=hmi|asdf123456789
+      - USERS=${FTP_USER}|${FTP_PASSWORD}
