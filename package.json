@@ -1,12 +1,18 @@
 {
-  "name": "SiemensHMIDataAdquisition",
+  "name": "wincc-hmi-files-sync",
   "version": "1.0.0",
   "description": "",
-  "main": "server.js",
   "type": "module",
+  "bin": "src/main.js",
+  "engines": {
+    "node": "16.13.1"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon server.js"
+    "dev": "node src/main.js",
+    "bundle": "esbuild src/main.js --platform=node --bundle --minify --outfile=dist/hmiFileSync.js",
+    "compile": "pkg --out-path dist/ -t node16-win-x64 dist/hmiFileSync.js",
+    "build": "npm run bundle && npm run compile"
   },
   "keywords": [],
   "author": "",
@@ -14,11 +20,15 @@
   "dependencies": {
     "cookie": "0.5.0",
     "dotenv": "^16.0.3",
+    "esbuild": "0.17.5",
     "node-fetch": "3.3.0",
-    "node-html-parser": "^6.1.4"
+    "node-html-parser": "^6.1.4",
+    "timeout-signal": "^2.0.0",
+    "winston": "^3.8.2"
   },
   "devDependencies": {
     "eslint": "8.33.0",
+    "nexe": "^4.0.0-rc.2",
     "pkg": "^5.8.0"
   }
 }

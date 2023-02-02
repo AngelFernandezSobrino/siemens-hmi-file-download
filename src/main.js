@@ -1,251 +1,180 @@
-import * as dotenv from 'dotenv'
+import * as dotenv from 'dotenv';
 dotenv.config()
 
-import fetch from 'node-fetch';
+import * as winston from 'winston'
+
 import { existsSync, mkdirSync, createWriteStream } from 'fs';
-import { parse as cookieParser } from 'cookie';
 import { parse as htmlParser } from 'node-html-parser';
 import * as fs from 'fs';
 
-// eslint-disable-next-line no-undef
+import { WSApi } from './winccWSConnection.js';
+import logger from './logger.js';
+
 const HMI_IP = process.env.HMI_IP || '192.168.0.3';
-// eslint-disable-next-line no-undef
 const HMI_USER = process.env.HMI_USER || 'admin';
-// eslint-disable-next-line no-undef
 const HMI_PASSWORD = process.env.HMI_PASSWORD || '1234';
 
-const HMI_LOGIN = '/FormLogin'; // 'LoginForm'
+const HMI_LOGIN_PATH = '/FormLogin';
+const HMI_BASE_PATH = '/StorageCardSD';
 
-const HMI_BASE_FILES_PATH = '/StorageCardSD';
+const LOCAL_DIRECTORY = process.env.LOCAL_DIRECTORY || './data';
+
+
 
 const files = [
 	{
-		remote: 'Logs/AlarmasGMP0.csv',
-		local: 'AlarmasGMP0',
-		extension: '.csv'
+		fileName: 'AlarmasGMP0.csv',
+		noExtensionName: 'AlarmasGMP0',
+		savePath: `${LOCAL_DIRECTORY}`,
+		extension: '.csv',
+		filePath: `${HMI_BASE_PATH}/Logs/AlarmasGMP0.csv?UP=TRUE&FORCEBROWSE`
 	},
 	{
-		remote: 'Logs/FicheroGMP0.csv',
-		local: 'FicheroGMP0',
-		extension: '.csv'
+		fileName: 'FicheroGMP0.csv',
+		noExtensionName: 'FicheroGMP0',
+		savePath: `${LOCAL_DIRECTORY}`,
+		extension: '.csv',
+		filePath: `${HMI_BASE_PATH}/Logs/FicheroGMP0.csv?UP=TRUE&FORCEBROWSE`
 	},
 	{
-		remote: 'AuditTrail0.csv',
-		local: 'AuditTrail0',
-		extension: '.csv'
+		fileName: 'AuditTrail0.csv',
+		noExtensionName: 'AuditTrail0',
+		savePath: `${LOCAL_DIRECTORY}`,
+		extension: '.csv',
+		filePath: `${HMI_BASE_PATH}/Logs/AuditTrail0.csv?UP=TRUE&FORCEBROWSE`
 	}
 ];
-
-const baseDir = 'data';
 
 const directories = [
 	'Logs_backup',
 	'Informes'
 ];
 
+checkLocalDirectories(directories, LOCAL_DIRECTORY);
+
+const maxLogFiles = 5;
+
+try {
+	fs.unlinkSync(LOCAL_DIRECTORY + '/run-' + maxLogFiles + '.log');
+} catch (e) { }
+
+for (let i = maxLogFiles - 1; i >= 0; i--) {
+	try {
+		fs.renameSync(LOCAL_DIRECTORY + '/run-' + i + '.log', LOCAL_DIRECTORY + '/run-' + (i + 1) + '.log');
+	} catch (e) { }
+}
+try {
+	fs.renameSync(LOCAL_DIRECTORY + '/last.log', LOCAL_DIRECTORY + '/run-0.log');
+} catch (e) { }
+
+
+logger.info('Starting backup service...');
+logger.info('HMI IP: ' + HMI_IP);
+logger.info('HMI User: ' + HMI_USER);
+
 (async () => {
 
-	if (!existsSync(baseDir + '/SyncBackups')) {
-		mkdirSync(baseDir + '/SyncBackups');
-	}
+	let hmiApi = new WSApi(HMI_IP, HMI_LOGIN_PATH, HMI_USER, HMI_PASSWORD, logger);
 
-	let session = await getWinccWSCookie(HMI_IP, HMI_USER, HMI_PASSWORD);
+	await hmiApi.authenticate();
 
 	// Get static named files
 	for (const file of files) {
-		console.log('Downloading file: ' + file.remote)
-		await delay(100);
-		for (let retries = 0; ; retries++) {
-			try {
-				console.log('Downloading file: ' + file.remote)
-				await getWinccWSFile(file.local, HMI_IP, HMI_BASE_FILES_PATH + '/' + file.remote + '?UP=TRUE&FORCEBROWSE', baseDir + '/' + file.local + '-new' + file.extension, session);
-				break;
-			} catch (e) {
-				console.log('Error downloading file: ' + file.remote);
-				if (maxRetries < 6) {
-					console.log('Retrying in 10 seconds...');
-					await delay(10000);
-					continue;
-				} else {
-					console.log('Max retries reached, aborting...');
-					console.log(e);
-					throw e;
-				}
-			}
-		}
-		console.log('File downloaded: ' + file.remote)
-		// Check if files "baseDir + '/' + file.local + '-new' + file.csv" exists on data directory and then compare its size with baseDir + '/' + file.local + file.extension.
-		// If the new file is bigger, then replace the old one with the new one.
-		// If the new file is smaller, then make a backup of the old one and replace it with the new one.
-		// If the new file is the same size, then remove the new file.
-		// If the new file doesn't exist, then raise an error.
-		// If the old file doesn't exist, then replace it with the new one.
-		let oldFile = baseDir + '/' + file.local + file.extension;
-		let newFile = baseDir + '/' + file.local + '-new' + file.extension;
-		if (!fs.existsSync(newFile)) {
-			throw new Error('New file doesn\'t exist: ' + newFile);
-		}
-		if (!fs.existsSync(oldFile)) {
-			console.log('Old file doesn\'t exist, replacing with new file: ' + oldFile);
-			fs.renameSync(newFile, oldFile);
-			continue;
-		}
-		let oldFileSize = fs.statSync(oldFile).size;
-		let newFileSize = fs.statSync(newFile).size;
-
-		console.log('Old file size: ' + oldFileSize);
-		console.log('New file size: ' + newFileSize);
-
-		if (oldFileSize < newFileSize) {
-			console.log('New file is bigger, replacing old file with new file: ' + oldFile);
-			fs.renameSync(newFile, oldFile);
-			continue;
-		}
-		if (oldFileSize > newFileSize) {
-			console.log('New file is smaller, making a backup of the old file and replacing it with the new file: ' + oldFile);
-			fs.renameSync(oldFile, baseDir + '/SyncBackups/' + file.local + '-syncbackup-' + new Date().getTime() + file.extension);
-			fs.renameSync(newFile, oldFile);
-			continue;
-		}
-		if (oldFileSize === newFileSize) {
-			console.log('New file is the same size, removve new file: ' + newFile);
-			// Delete newfile
-			fs.unlinkSync(newFile);
-		}
-
+		await hmiApi.downloadAndSaveFile(`${file.savePath}/${file.noExtensionName}-new${file.extension}`, file.filePath, 5);
+		processNewFiles(file.savePath, file.noExtensionName, file.extension);
 	}
 
-	checkLocalDirectories(directories, baseDir);
 
 	for (const directory of directories) {
-
-		let filesOnDevice = await getFilesInDeviceDirectory(directory, session);
-
-		// Check if files exists on data directory, if not download it
+		logger.info('Processing directory: ' + directory)
+		let filesOnDevice = await hmiApi.getFilesInDeviceDirectory('/StorageCardSD/' + directory);
 		for (const file of filesOnDevice) {
-			console.log('Processing file: ' + file.fileName)
-			await processFileDownload(baseDir, `http://${HMI_IP}`, directory, file, 5, session);
+			logger.info('Processing file: ' + file.fileName)
+			if (existsSync(file.savePath)) {
+				logger.info('File already exists: ' + file.fileName);
+				continue;
+			}
+			await hmiApi.downloadAndSaveFile(`${LOCAL_DIRECTORY}/${directory}/${file.fileName}`, file.filePath, file.fileName, 5);
 		}
 	}
 
+	logger.info('Backup finished');
 
 })();
 
-async function processFileDownload(baseDir, hmiUrl, directory, file, maxRetries, session) {
-	if (existsSync(baseDir + '/' + directory + '/' + file.fileName)) {
-		console.log('File already exists: ' + file.fileName);
+function processNewFiles(savePath, fileNameWithoutExtension, extension) {
+	let oldFile = savePath + '/' + fileNameWithoutExtension + extension;
+	let newFile = savePath + '/' + fileNameWithoutExtension + '-new' + extension;
+	if (!fs.existsSync(newFile)) {
+		throw new Error('New file doesn\'t exist: ' + newFile);
+	}
+	if (!fs.existsSync(oldFile)) {
+		logger.info('Old file doesn\'t exist, replacing with new file: ' + oldFile);
+		fs.renameSync(newFile, oldFile);
 		return;
 	}
-	await delay(100);
-	for (let retries = 0; ; retries++) {
-		try {
-			console.log('Downloading file: ' + file.fileName)
-			await getWinccWSFile(file.fileName, HMI_IP, file.filePath, baseDir + '/' + directory + '/' + file.fileName, session);
-			break;
-		} catch (e) {
-			console.log('Error downloading file: ' + file.fileName);
-			if (maxRetries < 6) {
-				console.log('Retrying in 10 seconds...');
-				await delay(10000);
-				continue;
-			} else {
-				console.log('Max retries reached, aborting...');
-				console.log(e);
-				throw e;
-			}
-		}
-	}
 
+	let oldFileSize = fs.statSync(oldFile).size;
+	let newFileSize = fs.statSync(newFile).size;
+
+	logger.info('Old file size: ' + oldFileSize);
+	logger.info('New file size: ' + newFileSize);
+
+	if (oldFileSize < newFileSize) {
+		logger.info('New file is bigger, replacing old file with new file: ' + oldFile);
+		fs.renameSync(newFile, oldFile);
+		return;
+	}
+	if (oldFileSize > newFileSize) {
+		logger.info('New file is smaller, making a backup of the old file and replacing it with the new file: ' + oldFile);
+		fs.renameSync(oldFile, savePath + '/SyncBackups/' + fileNameWithoutExtension + '-syncbackup-' + getFileStringDate(new Date()) + extension);
+		fs.renameSync(newFile, oldFile);
+		return;
+	}
+	if (oldFileSize === newFileSize) {
+		logger.info('New file is the same size, removve new file: ' + newFile);
+		// Delete newfile
+		fs.unlinkSync(newFile);
+	}
 }
 
-async function checkLocalDirectories(directories, baseDir) {
-	// Check if base directory exists
-	if (!existsSync(baseDir)) {
-		mkdirSync(baseDir);
+
+
+async function checkLocalDirectories(directories, localDirectory) {
+
+	if (!existsSync(localDirectory)) {
+		mkdirSync(localDirectory);
 	}
 
-	// Create directories if don't exist
 	directories.forEach((directory) => {
-		if (!existsSync(baseDir + '/' + directory)) {
-			mkdirSync(baseDir + '/' + directory);
+		if (!existsSync(localDirectory + '/' + directory)) {
+			mkdirSync(localDirectory + '/' + directory);
 		}
 	});
-}
 
-async function getFilesInDeviceDirectory(directory, session) {
-
-	let filesPageRequest = await getWinccWSPage(HMI_IP, '/StorageCardSD/' + directory + '?UP=TRUE&FORCEBROWSE', session);
-
-	let filesPageHtml = htmlParser(await filesPageRequest.text());
-
-	let filesTable = filesPageHtml.querySelectorAll('[href^="/StorageCardSD/"]');
-
-	let filesOnDevice = [];
-
-	filesTable.forEach((node) => {
-		filesOnDevice.push({ fileName: node.text, filePath: node.getAttribute('href') });
-	});
-
-	return filesOnDevice;
-}
-
-async function getWinccWSPage(hmiIp, url, session) {
-	return await fetch(`http://${hmiIp}/${url}`, {
-		method: 'GET',
-		headers: { 'Cookie': 'siemens_ad_session=' + session },
-		timeout: 3000
-	});
-}
-
-async function getWinccWSFile(fileName, hmiIp, getPath, savePath, session) {
-	return new Promise((resolve, reject) => {
-		try {
-			console.log(`Requesting file ${fileName} from ${hmiIp}`);
-			fetch(`http://${hmiIp}${getPath}`, {
-				method: 'GET',
-				headers: { 'Cookie': 'siemens_ad_session=' + session },
-				timeout: 60000
-			}).then((data) => {
-				console.log(`Saving file ${fileName} to ${savePath}`);
-				let file = createWriteStream(savePath);
-				let stream = data.body.pipe(file);
-				stream.on('finish', () => {
-					resolve();
-				});
-			});
-		}
-		catch (error) {
-			reject(error);
-		}
-	});
-}
-
-async function getWinccWSCookie(hmiIp, hmiUser, hmiPassword) {
-	try {
-
-		let loginRequest = await fetch(`http://${hmiIp}/FormLogin`, {
-			method: 'POST',
-			body: `Login=${hmiUser}&Password=${hmiPassword}`,
-			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-		});
-		let cookieValue = cookieParser(loginRequest.headers.get('set-cookie'));
-		return cookieValue['siemens_ad_session'];
-	} catch (e) {
-		throw new Error('Can not login into HMI');
+	if (!existsSync(localDirectory + '/SyncBackups')) {
+		mkdirSync(localDirectory + '/SyncBackups');
 	}
+
 }
 
-function formatDate(date) {
+function getFileStringDate(date) {
 	const map = {
 		mm: date.getMonth(),
 		dd: date.getDate(),
-		yyyy: date.getFullYear()
+		yyyy: date.getFullYear(),
+		hh: date.getHours(),
+		min: date.getMinutes(),
+		ss: date.getSeconds()
 	};
-	if (map.mm < 10) map.mm = '0' + map.mm;
-	if (map.dd < 10) map.dd = '0' + map.dd;
-	return map.yyyy + '_' + map.mm + '_' + map.dd;
+
+	return `${map.yyyy}_${twoDigits(map.mm)}_${twoDigits(map.dd)}_${twoDigits(map.hh)}_${twoDigits(map.min)}_${twoDigits(map.ss)}`;
 }
 
-function delay(time) {
+function twoDigits(number) {
+	return number > 10 ? number.toString() : '0' + number.toString();
+}
+
+export function delay(time) {
 	return new Promise(resolve => setTimeout(resolve, time));
 }
