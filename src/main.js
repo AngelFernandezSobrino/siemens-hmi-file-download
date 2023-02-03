@@ -41,7 +41,7 @@ const files = [
 		noExtensionName: 'AuditTrail0',
 		savePath: `${LOCAL_DIRECTORY}`,
 		extension: '.csv',
-		filePath: `${HMI_BASE_PATH}/Logs/AuditTrail0.csv?UP=TRUE&FORCEBROWSE`
+		filePath: `${HMI_BASE_PATH}/AuditTrail0.csv?UP=TRUE&FORCEBROWSE`
 	}
 ];
 
@@ -90,7 +90,7 @@ logger.info('HMI User: ' + HMI_USER);
 		let filesOnDevice = await hmiApi.getFilesInDeviceDirectory('/StorageCardSD/' + directory);
 		for (const file of filesOnDevice) {
 			logger.info('Processing file: ' + file.fileName)
-			if (existsSync(file.savePath)) {
+			if (existsSync(`${LOCAL_DIRECTORY}/${directory}/${file.fileName}`)) {
 				logger.info('File already exists: ' + file.fileName);
 				continue;
 			}

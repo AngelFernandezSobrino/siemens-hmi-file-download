@@ -20,7 +20,6 @@
   "dependencies": {
     "cookie": "0.5.0",
     "dotenv": "^16.0.3",
-    "esbuild": "0.17.5",
     "node-fetch": "3.3.0",
     "node-html-parser": "^6.1.4",
     "timeout-signal": "^2.0.0",
@@ -28,7 +27,7 @@
   },
   "devDependencies": {
     "eslint": "8.33.0",
-    "nexe": "^4.0.0-rc.2",
+    "esbuild": "0.17.5",
     "pkg": "^5.8.0"
   }
 }
