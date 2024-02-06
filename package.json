@@ -10,6 +10,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "node src/main.js",
+    "lint:fix": "eslint --fix ./src",
     "bundle": "esbuild src/main.js --platform=node --bundle --minify --outfile=dist/hmiFileSync.js",
     "compile": "pkg --out-path dist/ -t node16-win-x64 dist/hmiFileSync.js",
     "build": "npm run bundle && npm run compile"
@@ -26,7 +27,6 @@
     "winston": "^3.8.2"
   },
   "devDependencies": {
-    "eslint": "8.33.0",
     "esbuild": "0.17.5",
     "pkg": "^5.8.0"
   }

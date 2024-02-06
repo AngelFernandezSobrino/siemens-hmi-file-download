@@ -1,0 +1,29 @@
+{
+    "files": [
+        {
+            "fileName": "AlarmasGMP0.csv",
+            "noExtensionName": "AlarmasGMP0",
+            "savePath": "",
+            "extension": ".csv",
+            "filePath": "/Logs/AlarmasGMP0.csv"
+        },
+        {
+            "fileName": "FicheroGMP0.csv",
+            "noExtensionName": "FicheroGMP0",
+            "savePath": "",
+            "extension": ".csv",
+            "filePath": "/Logs/FicheroGMP0.csv"
+        },
+        {
+            "fileName": "AuditTrail0.csv",
+            "noExtensionName": "AuditTrail0",
+            "savePath": "",
+            "extension": ".csv",
+            "filePath": "/AuditTrail0.csv"
+        }
+    ],
+    "directories": [
+        "Logs_backup",
+        "Informes"
+    ]
+}
