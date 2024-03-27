@@ -1,3 +1,8 @@
+import logger from "./logger.js";
+
+import fs from "fs";
+
+import path from "path";
 
 /**
  *
@@ -6,43 +11,55 @@
  * @param extension
  */
 export function processNewFiles(savePath, fileNameWithoutExtension, extension) {
-	const oldFile = `${savePath}/${fileNameWithoutExtension}${extension}`;
-	const newFile = `${savePath}/${fileNameWithoutExtension}-new${extension}`;
+  const oldFile = `${savePath}/${fileNameWithoutExtension}${extension}`;
+  const newFile = `${savePath}/${fileNameWithoutExtension}-new${extension}`;
 
-	if (!fs.existsSync(newFile)) {
-		throw new Error(`New file doesn't exist: ${newFile}`);
-	}
-	if (!fs.existsSync(oldFile)) {
-		logger.info(`Old file doesn't exist, replacing with new file: ${oldFile}`);
-		fs.renameSync(newFile, oldFile);
-		return;
-	}
+  fs.mkdirSync(`${savePath}/SyncBackups`, {
+    recursive: true,
+  });
 
-	const oldFileSize = fs.statSync(oldFile).size;
-	const newFileSize = fs.statSync(newFile).size;
+  if (!fs.existsSync(newFile)) {
+    throw new Error(`New file doesn't exist: ${newFile}`);
+  }
+  if (!fs.existsSync(oldFile)) {
+    logger.info(`Old file doesn't exist, replacing with new file: ${oldFile}`);
+    fs.renameSync(newFile, oldFile);
+    return;
+  }
 
-	logger.info(`Old file size: ${oldFileSize}`);
-	logger.info(`New file size: ${newFileSize}`);
+  const oldFileSize = fs.statSync(oldFile).size;
+  const newFileSize = fs.statSync(newFile).size;
 
-	if (oldFileSize < newFileSize) {
-		logger.info(`New file is bigger, replacing old file with new file: ${oldFile}`);
-		fs.renameSync(newFile, oldFile);
-		return;
-	}
-	if (oldFileSize > newFileSize) {
-		logger.info(`New file is smaller, making a backup of the old file and replacing it with the new file: ${oldFile}`);
-		fs.renameSync(oldFile, `${savePath}/SyncBackups/${fileNameWithoutExtension}-syncbackup-${getFileStringDate(new Date())}${extension}`);
-		fs.renameSync(newFile, oldFile);
-		return;
-	}
-	if (oldFileSize === newFileSize) {
-		logger.info(`New file is the same size, removve new file: ${newFile}`);
+  logger.info(`Old file size: ${oldFileSize}`);
+  logger.info(`New file size: ${newFileSize}`);
 
-		// Delete newfile
-		fs.unlinkSync(newFile);
-	}
+  if (oldFileSize < newFileSize) {
+    logger.info(
+      `New file is bigger, replacing old file with new file: ${oldFile}`
+    );
+    fs.renameSync(newFile, oldFile);
+    return;
+  }
+  if (oldFileSize > newFileSize) {
+    logger.info(
+      `New file is smaller, making a backup of the old file and replacing it with the new file: ${oldFile}`
+    );
+    fs.renameSync(
+      oldFile,
+      `${savePath}/SyncBackups/${fileNameWithoutExtension}-${getFileStringDate(
+        new Date()
+      )}${extension}`
+    );
+    fs.renameSync(newFile, oldFile);
+    return;
+  }
+  if (oldFileSize === newFileSize) {
+    logger.info(`New file is the same size, removve new file: ${newFile}`);
+
+    // Delete newfile
+    fs.unlinkSync(newFile);
+  }
 }
-
 
 /**
  *
@@ -50,36 +67,56 @@ export function processNewFiles(savePath, fileNameWithoutExtension, extension) {
  * @param localDirectory
  */
 export async function checkLocalDirectories(directories, localDirectory) {
+  if (!fs.existsSync(localDirectory)) {
+    fs.mkdirSync(localDirectory, { recursive: true });
+  }
 
-	if (!fs.existsSync(localDirectory)) {
-		fs.mkdirSync(localDirectory);
-	}
+  directories.forEach((directory) => {
+    if (!fs.existsSync(`${localDirectory}${directory}`)) {
+      fs.mkdirSync(`${localDirectory}${directory}`, { recursive: true });
+    }
+  });
+}
 
-	directories.forEach(directory => {
-		if (!fs.existsSync(`${localDirectory}/${directory}`)) {
-			fs.mkdirSync(`${localDirectory}/${directory}`);
-		}
-	});
+/**
+ * 
+ * @param {number} number 
+ * @param {number} targetLength 
+ * @param {string} padString 
+ * @returns 
+ */
+function padStart(number, targetLength, padString) {
+  let string = number.toString();
+  targetLength = Math.floor(targetLength) || 0;
+  if (targetLength < string.length) return string;
 
-	if (!fs.existsSync(`${localDirectory}/SyncBackups`)) {
-		fs.mkdirSync(`${localDirectory}/SyncBackups`);
-	}
+  var pad = "";
+  var len = targetLength - string.length;
+  var i = 0;
+  while (pad.length < len) {
+    if (!padString[i]) {
+      i = 0;
+    }
 
+    pad += padString[i];
+    i++;
+  }
+
+  return pad + string;
 }
 
 /**
  *
- * @param date
+ * @param {Date} date
  */
 function getFileStringDate(date) {
-	const map = {
-		mm: date.getMonth(),
-		dd: date.getDate(),
-		yyyy: date.getFullYear(),
-		hh: date.getHours(),
-		min: date.getMinutes(),
-		ss: date.getSeconds()
-	};
-
-	return `${map.yyyy}_${twoDigits(map.mm)}_${twoDigits(map.dd)}_${twoDigits(map.hh)}_${twoDigits(map.min)}_${twoDigits(map.ss)}`;
+  return `${date.getFullYear()}${padStart(date.getMonth()+1, 2, "0")}${padStart(
+    date.getDate(),
+    2,
+    "0"
+  )}${padStart(date.getHours(), 2, "0")}${padStart(
+    date.getMinutes(),
+    2,
+    "0"
+  )}${padStart(date.getSeconds(), 2, "0")}`;
 }
