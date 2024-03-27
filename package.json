@@ -25,9 +25,7 @@
     "node-fetch": "3.3.0",
     "node-html-parser": "^6.1.4",
     "timeout-signal": "^2.0.0",
-    "winston": "^3.8.2"
-  },
-  "devDependencies": {
+    "winston": "^3.8.2",
     "esbuild": "0.17.5",
     "pkg": "^5.8.0"
   }
