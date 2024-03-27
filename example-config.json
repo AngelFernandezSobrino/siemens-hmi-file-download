@@ -3,27 +3,27 @@
         {
             "fileName": "AlarmasGMP0.csv",
             "noExtensionName": "AlarmasGMP0",
-            "savePath": "",
+            "savePath": "/LiveData",
             "extension": ".csv",
-            "filePath": "/Logs/AlarmasGMP0.csv"
+            "filePath": "/StorageCardSD/Logs/AlarmasGMP0.csv"
         },
         {
             "fileName": "FicheroGMP0.csv",
             "noExtensionName": "FicheroGMP0",
-            "savePath": "",
+            "savePath": "/LiveData",
             "extension": ".csv",
-            "filePath": "/Logs/FicheroGMP0.csv"
+            "filePath": "/StorageCardSD/Logs/FicheroGMP0.csv"
         },
         {
             "fileName": "AuditTrail0.csv",
             "noExtensionName": "AuditTrail0",
-            "savePath": "",
+            "savePath": "/LiveData",
             "extension": ".csv",
-            "filePath": "/AuditTrail0.csv"
+            "filePath": "/StorageCardSD/AuditTrail0.csv"
         }
     ],
     "directories": [
-        "Logs_backup",
-        "Informes"
+        "/StorageCardSD/Logs_backup",
+        "/StorageCardSD/Informes"
     ]
 }
