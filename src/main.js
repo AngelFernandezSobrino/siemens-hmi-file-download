@@ -18,16 +18,11 @@ program
   won't be modified on the HMI after creation, such as historical logs, reports, etc.`
   )
   .version("1.0")
-  .requiredOption("-c, --config <file>", "Required. Configuration file path")
+  .option("-c, --config <file>", "Required. Configuration file path")
   .option("-d, --directory <directory>", "Directory for saving data", "./data")
   .parse(process.argv);
 
 let options = program.opts();
-
-if (!options.config) {
-  console.error("Configuration file is required");
-  process.exit(1);
-}
 
 import * as dotenv from "dotenv";
 dotenv.config();
@@ -68,14 +63,14 @@ const HMI_LOGIN_PATH = "/FormLogin";
         `${LOCAL_DIRECTORY}/run-${i}.log`,
         `${LOCAL_DIRECTORY}/run-${i + 1}.log`
       );
-    } catch (e) {}
+    } catch (e) { }
   }
   try {
     fs.renameSync(
       `${LOCAL_DIRECTORY}/last.log`,
       `${LOCAL_DIRECTORY}/run-0.log`
     );
-  } catch (e) {}
+  } catch (e) { }
 
   logger.info("Starting backup service...");
   logger.info(`HMI IP: ${HMI_IP}`);
