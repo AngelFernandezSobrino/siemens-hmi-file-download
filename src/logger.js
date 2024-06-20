@@ -3,7 +3,7 @@ import * as winston from 'winston';
 const LOGS_DIRECTORY = process.env.LOGS_DIRECTORY || 'data';
 
 export default winston.createLogger({
-  level: 'info',
+  level: process.env.LOGGER_LEVEL || 'info',
   format: winston.format.combine(
     winston.format.timestamp(),
     winston.format.printf((info) => {

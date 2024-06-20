@@ -33,21 +33,49 @@ export class WSApi {
   async authenticate() {
     try {
       this.logger.info(
+        `Request FormGuid from https://${this.hmiIp}/start.html`
+      )
+      
+      let startPageRequest = await fetch(`https://${this.hmiIp}/start.html`, {
+        method: "GET",
+        headers: { "Host": this.hmiIp },
+        agent: this.httpsAgent,
+      });
+
+      let startPageText = await startPageRequest.text();
+      let startPageHtml = htmlParser(startPageText);
+      let formGuidInput = startPageHtml.querySelector(`input[name="FormGuid"]`);
+
+      let formGuid = formGuidInput.attributes['value']
+      this.logger.debug("FormGuid: " + formGuid);
+
+      this.logger.info(
         `Requesting cookie from https://${this.hmiIp}${this.hmiLoginPath}`
       );
+
+
       let loginRequest = await fetch(
         `https://${this.hmiIp}${this.hmiLoginPath}`,
         {
           method: "POST",
           body: `Login=${this.hmiUser}&Password=${this.hmiPassword}`,
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          headers: { 
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Content-Length": "0",
+            "Host": this.hmiIp,
+            "Cookie": `siemens_automation_formguid=${formGuid}; path=/; Secure`,
+            //"Cookie": `siemens_automation_formguid=4E6D33C0-C315-11DA-A172-9D5E9C481619; path=/; Secure`
+          },
+          body: `Login=${this.hmiUser}&Redirection=https://${this.hmiIp}/start.html&Password=${this.hmiPassword}&FormGuid=${formGuid}`,
           agent: this.httpsAgent,
         }
       );
+      this.logger.debug("Login response: " + loginRequest.status);
       let cookieValue = cookieParser(
         loginRequest.headers.get("set-cookie") || ""
       );
       this.session = cookieValue["siemens_ad_secure_session"];
+      this.logger.debug("Session cookie: " + this.session);
     } catch (e) {
       this.logger.error(`Error authenticating: ${e}`);
     }
@@ -57,7 +85,7 @@ export class WSApi {
     this.logger.info(`Requesting page ${endpoint} from ${this.hmiIp}`);
     return await fetch(`https://${this.hmiIp}${endpoint}`, {
       method: "GET",
-      headers: { Cookie: "siemens_ad_secure_session=" + this.session },
+      headers: { Cookie: "siemens_ad_secure_session=" + this.session + "; /MiniWeb/FormAuthResponse.mwsl; siemens_automation_formguid=26FB1CC0-C2F8-11DA-B1F0-736BE6321D40;" },
       signal: timeoutSignal(5000),
       agent: this.httpsAgent,
     });
